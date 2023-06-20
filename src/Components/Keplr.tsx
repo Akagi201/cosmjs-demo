@@ -1,6 +1,10 @@
 import type { ChainInfo } from "@keplr-wallet/types";
 import React, { useEffect, useState } from "react";
 import osmo from "../config/osmosis";
+import {
+	assertIsDeliverTxSuccess,
+	SigningStargateClient,
+} from "@cosmjs/stargate";
 
 function Keplr() {
 	const [chain, setChain] = useState<ChainInfo>(osmo);
@@ -27,17 +31,89 @@ function Keplr() {
 		getBalances();
 	}, [address, client, sendHash]);
 
-	// 连接keplr钱包  Todo
-	const connectWallet = async () => {};
+	// 连接 keplr 钱包  Todo
+	const connectWallet = async () => {
+		if (!window.keplr || !window.getOfflineSigner) {
+			alert("Please install keplr extension");
+		}
+
+		await window.keplr.experimentalSuggestChain(chain);
+		await window.keplr.enable(chain.chainId);
+
+		const offlineSigner = window.keplr.getOfflineSigner(chain.chainId);
+		const accounts = await offlineSigner.getAccounts();
+		const client = await SigningStargateClient.connectWithSigner(
+			chain.rpc,
+			offlineSigner,
+		);
+
+		setAddress(accounts[0].address);
+		setClient(client);
+	};
 
 	// 余额查询  Todo
-	const getBalances = async () => {};
+	const getBalances = async () => {
+		if (!client) {
+			return;
+		}
 
-	// txhash查询  Todo
-	const getTx = async () => {};
+		const _balance = await client.getBalance(
+			address,
+			chain.stakeCurrency.coinMinimalDenom,
+		);
+		setBalance(_balance);
+	};
+
+	// txhash 查询  Todo
+	const getTx = async () => {
+		if (!tx) {
+			return;
+		}
+
+		const result = await client.getTx(tx);
+		setTxRes(result);
+	};
 
 	// 转账 Todo
-	const sendToken = async () => {};
+	const sendToken = async () => {
+		if (!client || !recipent || !address) {
+			return;
+		}
+
+		const convertAmount = 10 * 1e6;
+		const amount = [
+			{
+				denom: chain.stakeCurrency.coinMinimalDenom,
+				amount: convertAmount.toString(),
+			},
+		];
+		const fee = {
+			amount: {
+				denom: chain.stakeCurrency.coinMinimalDenom,
+				amount: 0.025,
+			},
+			gas: "200000",
+		};
+
+		try {
+			const result = await client.sendTokens(
+				address,
+				recipent,
+				amount,
+				fee,
+				"",
+			);
+			assertIsDeliverTxSuccess(result);
+			if (result.code == 0) {
+				alert(
+					`transfer success, height ${result.height}, hash: ${result.transactionHash}`,
+				);
+			}
+			setTx(result.transactionHash);
+		} catch (e) {
+			console.error(e);
+		}
+	};
 
 	return (
 		<div className="keplr">
@@ -56,12 +132,12 @@ function Keplr() {
 				</span>{" "}
 				&nbsp;
 				<button onClick={connectWallet}>
-					{address ? "已连接" : "连接keplr"}
+					{address ? "已连接" : "连接 keplr"}
 				</button>
 			</label>
 			<div className="weight">地址：{address}</div>
 			<div className="weight">
-				<span style={{ whiteSpace: "nowrap" }}>余额: &nbsp;</span>
+				<span style={{ whiteSpace: "nowrap" }}>余额：&nbsp;</span>
 				<div>
 					{balance?.amount && (
 						<>

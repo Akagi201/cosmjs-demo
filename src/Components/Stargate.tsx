@@ -1,4 +1,7 @@
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
+import {
+	DirectSecp256k1HdWallet,
+	DirectSecp256k1Wallet,
+} from "@cosmjs/proto-signing";
 import {
 	Account,
 	Block,
@@ -51,22 +54,68 @@ function Stargate() {
 	}, [address, client]);
 
 	// 创建账户 Todo
-	const createAccount = async () => {};
+	const createAccount = async () => {
+		const myAccount = await DirectSecp256k1HdWallet.generate(12, {
+			prefix: "osmo",
+		});
+		setMnemonic(myAccount.mnemonic);
+		localStorage.setItem("mnemonic", myAccount.mnemonic);
+	};
 
 	// 通过助记词钱包获得地址 Todo
-	const getAddressByMnemonic = async () => {};
+	const getAddressByMnemonic = async () => {
+		const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
+			prefix: "osmo",
+		});
+		const [firstAccount] = await wallet.getAccounts();
+		setAddress(firstAccount.address);
+	};
 
 	// 余额查询 Todo
-	const getBalance = async () => {};
+	const getBalance = async () => {
+		if (!client) {
+			return;
+		}
+
+		const balance = await client.getBalance(
+			address,
+			chain.stakeCurrency.coinMinimalDenom,
+		);
+		setBalance(balance);
+	};
 
 	// strageClient 基础 api 使用 Todo
-	const getOthers = async () => {};
+	const getOthers = async () => {
+		setChainId(await client.getChainId());
+		const _account = await client.getAccount(address);
+		setAccount(_account);
+		const _height = await client.getHeight();
+		const _block = await client.getBlock(_height);
+		setHeight(_height);
+		setBlock(_block);
+		setSequence(await client.getSequence(address));
+		setAllBalances(await client.getAllBalances(address));
+	};
 
 	// connect client Todo
-	const connect = async () => {};
+	const connect = async () => {
+		const _client = await StargateClient.connect(chain.rpc);
+		setClient(_client);
+	};
 
 	// disconnect client Todo
-	const disConnect = async () => {};
+	const disConnect = async () => {
+		client.disconnect();
+
+		setClient(null);
+		setAddress(null);
+		setChainId(null);
+		setHeight(null);
+		setBalance(null);
+		setAllBalances(null);
+		setBlock(null);
+		setSequence(null);
+	};
 
 	return (
 		<div className="stargate">
@@ -112,7 +161,7 @@ function Stargate() {
 				</span>
 				&nbsp;
 				{address && (
-					<a href="https://faucet.testnet.osmosis.zone" target="_blank">
+					<a href="https://faucet.osmosis.zone/" target="_blank">
 						获取
 					</a>
 				)}
